@@ -1,6 +1,9 @@
 name: build-aseprite-latest
 on:
   workflow_dispatch:
+  watch:
+    types: [started]
+    
 jobs:
   start-build:
     name: "开始编译最新版aseprite"
