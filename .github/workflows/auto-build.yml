@@ -1,0 +1,63 @@
+name: Auto build Aseprite
+
+on:
+  push:
+    branches: main
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  auto-build:
+    name: Auto build Aseprite for Windows x64
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download Aseprite
+        run: |
+          python download.py
+
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@v1.1
+
+      - name: Setup MSVC Developer Command Prompt
+        uses: TheMrMilchmann/setup-msvc-dev@v3
+        with:
+          arch: x64
+
+      - name: Build Aseprite
+        run: |
+          mkdir build
+          cd build
+          cmake "${{ github.workspace }}/src/aseprite" -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DLAF_BACKEND=skia -DSKIA_DIR="${{ github.workspace }}/src/skia" -DSKIA_LIBRARY_DIR="${{ github.workspace }}/src/skia/out/Release-x64" -DSKIA_LIBRARY="${{ github.workspace }}/src/skia/out/Release-x64/skia.lib"
+          cmake --build . --config MinSizeRel --target aseprite
+          copy "C:/Windows/System32/libcrypto-1_1-x64.dll" ./bin
+
+      - name: Get version
+        id: get_version
+        run: |
+          $version = Get-Content version.txt
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Zip Aseprite
+        run: |
+          cd build/bin
+          7z a ../../Aseprite-Windows-x64-${{ steps.get_version.outputs.version }}.zip *
+
+      - name: GH Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Aseprite-Windows-x64-${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.version }}
+          files: |
+            Aseprite-Windows-x64-${{ steps.get_version.outputs.version }}.zip
